@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using IdiotGui.Core.BasicTypes;
 
@@ -36,7 +37,7 @@ namespace IdiotGui.Core.Elements
     /// <summary>
     ///   The Margin around (outside) this element. This is the outer shell, before the border is applied.
     /// </summary>
-    public BorderSize Margin = 6;
+    public BorderSize Margin = 10;
 
     /// <summary>
     ///   The padding inside this element, between the Border and the ContentArea.
@@ -46,7 +47,7 @@ namespace IdiotGui.Core.Elements
     /// <summary>
     ///   The border style of this element, much like the CSS property "border".
     /// </summary>
-    public BorderStyle Border = new BorderStyle(1, Theme.Colors.DefaultBorder);
+    public BorderStyle Border = new BorderStyle(0, Theme.Colors.DefaultBorder);
 
     /// <summary>
     ///   All children elements of this element (all drawn within ContentArea if overflow is hidden).
@@ -68,6 +69,11 @@ namespace IdiotGui.Core.Elements
     /// </summary>
     protected Size ComputedMinSize;
 
+    /// <summary>
+    ///   The Computed margin (after margin-collapsing)
+    /// </summary>
+    protected BorderSize ComputedMargin;
+
     #endregion
 
     public Element GetTopmostElementAtPoint(Point point)
@@ -80,19 +86,13 @@ namespace IdiotGui.Core.Elements
       return Children.Select(c => c.GetTopmostElementAtPoint(point)).FirstOrDefault(c => c != null) ?? this;
     }
 
-    internal void DumpLayout(int indent = 0)
-    {
-      Console.WriteLine(string.Concat(Enumerable.Repeat("  ", indent)) + BoxArea + " - " + ContentArea);
-      foreach (var child in Children) child.DumpLayout(indent + 1);
-    }
-
     /// <summary>
     ///   Lays out children components based on our own size. By the time this is called for any Element, the current element
     ///   has already had it's ContentArea set.
     /// </summary>
     protected void LayoutChildren()
     {
-      ContentArea = BoxArea - Margin - Border.Size - Padding;
+      ContentArea = BoxArea - ComputedMargin - Border.Size - Padding;
       // Quick short-circuit for leaf Elements
       if (Children.Count == 0) return;
       // Handle each orientation individual, it turned into too much of a mess to try and keep major and minor axises separate.
@@ -113,9 +113,11 @@ namespace IdiotGui.Core.Elements
           var childBoxOffsetForVertical = ContentArea.Location;
           foreach (var child in Children)
           {
-            var width = Math.Min(child.Width is SFixed @fixed ? @fixed.Size : ContentArea.Width, ContentArea.Width);
-            var paddingHeight = child.Margin.Top + child.Margin.Bottom + child.Border.Size.Top +
-                               child.Border.Size.Bottom + Padding.Top + Padding.Bottom;
+            var paddingHeight = child.ComputedMargin.Top + child.ComputedMargin.Bottom + child.Border.Size.Top +
+                                child.Border.Size.Bottom + Padding.Top + Padding.Bottom;
+            var paddingWidth = child.ComputedMargin.Left + child.ComputedMargin.Right + child.Border.Size.Left +
+                               child.Border.Size.Right + Padding.Left + Padding.Right;
+            var width = child.Width is SFixed @fixed ? @fixed.Size + paddingWidth : ContentArea.Width;
             switch (child.Height)
             {
               case SFixed sFixed:
@@ -130,9 +132,9 @@ namespace IdiotGui.Core.Elements
                   new Size(width, Math.Max(child.ComputedMinSize.Height, paddingHeight + possibleOverflow)));
                 break;
               case SFitChildren _:
-                // The size is just the min size
+                // The size is just the min size. Note that padding is already built into that.
                 child.BoxArea = new Rectangle(childBoxOffsetForVertical,
-                  new Size(width, paddingHeight + child.ComputedMinSize.Height));
+                  new Size(width, child.ComputedMinSize.Height));
                 break;
             }
             childBoxOffsetForVertical.Top += child.BoxArea.Height;
@@ -140,6 +142,7 @@ namespace IdiotGui.Core.Elements
           }
           break;
         case ChildAlignments.Horizontal:
+          // Just like the above but for horizontal
           var minChildrenWidth = Children.Select(c => c.ComputedMinSize.Width).Sum();
           var remainingContentWidth = ContentArea.Width - minChildrenWidth;
           var totalChildrenWeightedWidth = Children
@@ -149,13 +152,16 @@ namespace IdiotGui.Core.Elements
           var childBoxOffsetForHorizontal = ContentArea.Location;
           foreach (var child in Children)
           {
-            var height = Math.Min(child.Height is SFixed @fixed ? @fixed.Size : ContentArea.Height, ContentArea.Height);
-            var paddingWidth = child.Margin.Left + child.Margin.Right + child.Border.Size.Left +
+            var paddingHeight = child.ComputedMargin.Top + child.ComputedMargin.Bottom + child.Border.Size.Top +
+                                child.Border.Size.Bottom + Padding.Top + Padding.Bottom;
+            var paddingWidth = child.ComputedMargin.Left + child.ComputedMargin.Right + child.Border.Size.Left +
                                child.Border.Size.Right + Padding.Left + Padding.Right;
+            var height = child.Height is SFixed @fixed ? @fixed.Size + paddingHeight : ContentArea.Height;
             switch (child.Width)
             {
               case SFixed sFixed:
-                child.BoxArea = new Rectangle(childBoxOffsetForHorizontal, new Size(paddingWidth + sFixed.Size, height));
+                child.BoxArea = new Rectangle(childBoxOffsetForHorizontal,
+                  new Size(paddingWidth + sFixed.Size, height));
                 break;
               case SWeighted sWeighted:
                 var relativeWeight = sWeighted.Weight / totalChildrenWeightedWidth;
@@ -165,7 +171,7 @@ namespace IdiotGui.Core.Elements
                 break;
               case SFitChildren _:
                 child.BoxArea = new Rectangle(childBoxOffsetForHorizontal,
-                  new Size(paddingWidth + child.ComputedMinSize.Width, height));
+                  new Size(child.ComputedMinSize.Width, height));
                 break;
             }
             childBoxOffsetForHorizontal.Left += child.BoxArea.Width;
@@ -181,12 +187,39 @@ namespace IdiotGui.Core.Elements
     ///   Computes the minimum size of all elements in the tree. Note that many will have zero dimensions but (hopefully) won't
     ///   be zero after the full layout.
     /// </summary>
-    protected void ComputeMinimumSize()
+    protected void ComputeSizes()
     {
+      // Compute margin-collapsing on the way down the tree
+      foreach (var child in Children) child.ComputedMargin = child.Margin;
+      switch (ChildAlignment)
+      {
+        case ChildAlignments.Horizontal:
+          // Collapse horizontal
+          foreach (var childPair in Children.Zip(Children.Skip(1), (lchild, rchild) => new {lchild, rchild}))
+          {
+            // Collapse all middle-margins to 1/2 the value of the max of the two margins
+            childPair.lchild.ComputedMargin.Right =
+              Math.Max(childPair.lchild.Margin.Right, childPair.rchild.Margin.Left) / 2.0f;
+            childPair.rchild.ComputedMargin.Left = childPair.lchild.ComputedMargin.Right;
+          }
+          break;
+        case ChildAlignments.Vertical:
+          // Collapse vertical
+          foreach (var childPair in Children.Zip(Children.Skip(1), (lchild, rchild) => new {lchild, rchild}))
+          {
+            // Collapse all middle-margins to 1/2 the value of the max of the two margins
+            childPair.lchild.ComputedMargin.Bottom =
+              Math.Max(childPair.lchild.Margin.Bottom, childPair.rchild.Margin.Top) / 2.0f;
+            childPair.rchild.ComputedMargin.Top = childPair.lchild.ComputedMargin.Bottom;
+          }
+          break;
+        default:
+          throw new ArgumentOutOfRangeException();
+      }
       // Compute min size on the way up the tree
-      foreach (var child in Children) child.ComputeMinimumSize();
+      foreach (var child in Children) child.ComputeSizes();
       // The min size starts off a the margin + border + padding
-      var minShellSize = Margin + Border.Size + Padding;
+      var minShellSize = ComputedMargin + Border.Size + Padding;
       ComputedMinSize = new Size(minShellSize.Left + minShellSize.Right, minShellSize.Top + minShellSize.Bottom);
       switch (Height)
       {
@@ -199,7 +232,21 @@ namespace IdiotGui.Core.Elements
           ComputedMinSize.Height += MinSize.Height;
           break;
         case SFitChildren _:
-          ComputedMinSize.Height += Math.Max(MinSize.Height, Children.Select(c => c.ComputedMinSize.Height).Sum());
+          switch (ChildAlignment)
+          {
+            case ChildAlignments.Horizontal:
+              // If our children are in a line then just find the largest of them
+              ComputedMinSize.Height += Math.Max(MinSize.Height,
+                Children.Select(c => c.ComputedMinSize.Height).DefaultIfEmpty().Max());
+              break;
+            case ChildAlignments.Vertical:
+              // Otherwise sum them up
+              ComputedMinSize.Height += Math.Max(MinSize.Height,
+                Children.Select(c => c.ComputedMinSize.Height).Sum());
+              break;
+            default:
+              throw new ArgumentOutOfRangeException();
+          }
           break;
       }
       // Same as above, but for Width
@@ -212,9 +259,29 @@ namespace IdiotGui.Core.Elements
           ComputedMinSize.Width += MinSize.Width;
           break;
         case SFitChildren _:
-          ComputedMinSize.Width += Math.Max(MinSize.Width, Children.Select(c => c.ComputedMinSize.Width).Sum());
+          switch (ChildAlignment)
+          {
+            case ChildAlignments.Horizontal:
+              // Otherwise sum them up
+              ComputedMinSize.Width += Math.Max(MinSize.Width,
+                Children.Select(c => c.ComputedMinSize.Width).Sum());
+              break;
+            case ChildAlignments.Vertical:
+              // If our children are in a line then just find the largest of them
+              ComputedMinSize.Width += Math.Max(MinSize.Width,
+                Children.Select(c => c.ComputedMinSize.Width).DefaultIfEmpty().Max());
+              break;
+            default:
+              throw new ArgumentOutOfRangeException();
+          }
           break;
       }
+    }
+
+    internal void DumpLayout(int indent = 0)
+    {
+      Console.WriteLine(string.Concat(Enumerable.Repeat("  ", indent)) + BoxArea + " - " + ContentArea);
+      foreach (var child in Children) child.DumpLayout(indent + 1);
     }
   }
 }

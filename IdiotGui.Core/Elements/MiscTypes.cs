@@ -7,10 +7,10 @@ namespace IdiotGui.Core.Elements
   {
     #region Fields / Properties
 
-    public int Top;
-    public int Right;
-    public int Bottom;
-    public int Left;
+    public float Top;
+    public float Right;
+    public float Bottom;
+    public float Left;
 
     /// <summary>
     /// Evaluates to true only if all values are the same (even 0).
@@ -19,7 +19,7 @@ namespace IdiotGui.Core.Elements
 
     #endregion
 
-    public BorderSize(int top, int right, int bottom, int left)
+    public BorderSize(float top, float right, float bottom, float left)
     {
       Top = top;
       Right = right;
@@ -27,9 +27,9 @@ namespace IdiotGui.Core.Elements
       Left = left;
     }
 
-    public static implicit operator BorderSize(int value) => new BorderSize(value, value, value, value);
+    public static implicit operator BorderSize(float value) => new BorderSize(value, value, value, value);
 
-    public static implicit operator BorderSize(int[] values)
+    public static implicit operator BorderSize(float[] values)
     {
       switch (values.Length)
       {
@@ -40,22 +40,25 @@ namespace IdiotGui.Core.Elements
       throw new Exception("BorderSize from int array must be 1, 2, or 4 values.");
     }
 
-    public bool Equals(BorderSize other) => Top == other.Top && Right == other.Right && Bottom == other.Bottom && Left == other.Left;
+    public bool Equals(BorderSize other)
+    {
+      return Top.Equals(other.Top) && Right.Equals(other.Right) && Bottom.Equals(other.Bottom) && Left.Equals(other.Left);
+    }
 
     public override bool Equals(object obj)
     {
       if (ReferenceEquals(null, obj)) return false;
-      return obj is BorderSize && Equals((BorderSize) obj);
+      return obj is BorderSize size && Equals(size);
     }
 
     public override int GetHashCode()
     {
       unchecked
       {
-        var hashCode = Top;
-        hashCode = (hashCode * 397) ^ Right;
-        hashCode = (hashCode * 397) ^ Bottom;
-        hashCode = (hashCode * 397) ^ Left;
+        var hashCode = Top.GetHashCode();
+        hashCode = (hashCode * 397) ^ Right.GetHashCode();
+        hashCode = (hashCode * 397) ^ Bottom.GetHashCode();
+        hashCode = (hashCode * 397) ^ Left.GetHashCode();
         return hashCode;
       }
     }
@@ -77,11 +80,11 @@ namespace IdiotGui.Core.Elements
 
     public BorderSize Size;
     public Color Color;
-    public BorderSize Radius;
+    public float Radius;
 
     #endregion
 
-    public BorderStyle(BorderSize size, Color color, BorderSize radius)
+    public BorderStyle(BorderSize size, Color color, float radius)
     {
       Size = size;
       Color = color;
@@ -108,11 +111,11 @@ namespace IdiotGui.Core.Elements
   {
     #region Fields / Properties
 
-    public int Size;
+    public float Size;
 
     #endregion
 
-    public SFixed(int size) : base(SizingTypes.Fixed) => Size = size;
+    public SFixed(float size) : base(SizingTypes.Fixed) => Size = size;
 
     public static explicit operator SFixed(int size) => new SFixed(size);
   }

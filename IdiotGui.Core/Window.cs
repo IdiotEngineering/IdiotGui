@@ -123,6 +123,11 @@ namespace IdiotGui.Core
           _lastMouseOver?.OnMouseLeave();
         }
       };
+      // A few default for the window Element
+      Background = Theme.Colors.DefaultFill;
+      Margin = 0;
+      Border = new BorderStyle(0, Theme.Colors.DefaultBorder);
+      Padding = 0;
     }
 
     public void Dispose()
@@ -205,7 +210,7 @@ namespace IdiotGui.Core
       Width = (SFixed) NativeWindow.Width;
       Height = (SFixed) NativeWindow.Height;
       BoxArea = new Rectangle(new Point(), WindowClientSize);
-      ComputeMinimumSize();
+      ComputeSizes();
       LayoutChildren();
     }
   }

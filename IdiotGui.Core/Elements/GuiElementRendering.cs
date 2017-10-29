@@ -1,5 +1,4 @@
-﻿using System;
-using IdiotGui.Core.BasicTypes;
+﻿using IdiotGui.Core.BasicTypes;
 using SkiaSharp;
 
 namespace IdiotGui.Core.Elements
@@ -34,18 +33,30 @@ namespace IdiotGui.Core.Elements
         foreach (var child in Children) child.Draw(canvas);
         return;
       }
-      canvas.DrawRect(BoxArea, new SKPaint {Color = Color.Red, Style = SKPaintStyle.Stroke});
-      canvas.DrawRect(BoxArea - Margin, new SKPaint {Color = Color.Blue, Style = SKPaintStyle.Stroke});
-      canvas.DrawRect(ContentArea + Padding, new SKPaint {Color = Color.Green, Style = SKPaintStyle.Stroke});
+      // Background
+      if (!Background.IsTransparent)
+        if (Border.Radius > float.Epsilon)
+          canvas.DrawRoundRect(ContentArea + Padding + Border.Size,
+            Border.Radius, Border.Radius,
+            new SKPaint
+            {
+              IsAntialias = true,
+              Color = Background,
+              Style = SKPaintStyle.Fill
+            });
+        else
+          canvas.DrawRect(ContentArea + Padding + Border.Size,
+            new SKPaint
+            {
+              IsAntialias = true,
+              Color = Background,
+              Style = SKPaintStyle.Fill
+            });
       // Border
       if (hasBoder)
-      {
-        if (!Border.Radius.IsUniform)
-          throw new NotSupportedException("Cannot yet draw elements with non-uniform border radii.");
-        if (Border.Radius != 0)
-          canvas.DrawRoundRect(ContentArea + Padding + Border.Size.Left / 2,
-            Border.Radius.Left,
-            Border.Radius.Left,
+        if (Border.Radius > float.Epsilon)
+          canvas.DrawRoundRect(ContentArea + Padding + Border.Size.Left / 2.0f,
+            Border.Radius, Border.Radius,
             new SKPaint
             {
               IsAntialias = true,
@@ -54,7 +65,7 @@ namespace IdiotGui.Core.Elements
               // StrokeWidth = Border.WindowClientSize.Left
             });
         else
-          canvas.DrawRect(ContentArea + Padding + Border.Size.Left / 2,
+          canvas.DrawRect(ContentArea + Padding + Border.Size.Left / 2.0f,
             new SKPaint
             {
               IsAntialias = true,
@@ -62,30 +73,14 @@ namespace IdiotGui.Core.Elements
               Style = SKPaintStyle.Stroke
               //StrokeWidth = Border.WindowClientSize.Left
             });
-      }
-      // Background
-      if (!Background.IsTransparent)
+      // Debug
+      if (false)
       {
-        if (!Border.Radius.IsUniform)
-          throw new NotSupportedException("Cannot yet draw elements with non-uniform border radii.");
-        if (Border.Radius != 0)
-          canvas.DrawRoundRect(ContentArea + Padding,
-            Border.Radius.Left,
-            Border.Radius.Left,
-            new SKPaint
-            {
-              IsAntialias = true,
-              Color = Background,
-              Style = SKPaintStyle.Fill
-            });
-        else
-          canvas.DrawRect(ContentArea + Padding + Border.Size.Left / 2,
-            new SKPaint
-            {
-              IsAntialias = true,
-              Color = Background,
-              Style = SKPaintStyle.Fill
-            });
+        canvas.DrawRect(BoxArea, new SKPaint {Color = Color.Red, Style = SKPaintStyle.Stroke, IsAntialias = true});
+        canvas.DrawRect(BoxArea - ComputedMargin,
+          new SKPaint {Color = Color.Green, Style = SKPaintStyle.Stroke, IsAntialias = true});
+        canvas.DrawRect(BoxArea - ComputedMargin - Border.Size,
+          new SKPaint {Color = Color.Blue, Style = SKPaintStyle.Stroke, IsAntialias = true});
       }
       foreach (var child in Children) child.Draw(canvas);
     }

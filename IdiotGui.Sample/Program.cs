@@ -24,36 +24,68 @@ namespace IdiotGui.Sample
             {
               new Element
               {
-                Background = Color.DarkMagenta,
-                Height = (SFixed) 50,
-                Border = new BorderStyle(1, Color.White, 5),
-                MouseEnter = elem => elem.Background = Color.CornflowerBlue,
-                MouseLeave = elem => elem.Background = Color.DarkMagenta
-              },
-              new Button(),
-              new Button()
+                Background = Color.DarkOrange,
+                ChildAlignment = ChildAlignments.Vertical,
+                Children = new List<Element>
+                {
+                  new Element
+                  {
+                    Background = Color.DarkMagenta,
+                    Height = (SFixed) 50,
+                    Border = new BorderStyle(1, Color.White, 5)
+                  },
+                  new Button(),
+                  new Button(),
+                  new Button(),
+                  new Button(),
+                  new Element
+                  {
+                    ChildAlignment = ChildAlignments.Horizontal,
+                    Background = Color.DarkSlateGray,
+                    Children = new List<Element>
+                    {
+                      new Button(),
+                      new Button(),
+                      new Button()
+                    }
+                  }
+                }
+              }
             }
           },
           new Element {Background = Color.Chartreuse, Width = new SFill()},
           new Element {Background = Color.DarkGreen, Width = (SFixed) 400}
         }
       };
+      windowOne.Closing += (sender, eventArgs) => quit = true;
+
       var windowTwo = new Window("Window Two", 200, 200)
       {
         Children = new List<Element>
         {
-          //new Element {Background = Color.DarkRed, Width = (SFixed) 10},
-          new Element {Background = Color.Chartreuse, Width = new SFill()},
-          new Element {Background = Color.Chocolate, Width = new SFill()},
-          new Element {Background = Color.CadetBlue, Width = new SFill()},
-          new Element {Background = Color.Gainsboro, Width = new SFill()},
-          //new Element {Background = Color.DarkGreen, Width = (SFixed) 20}
+          new Element
+          {
+            Background = Color.DarkGreen,
+            Width = (SFixed) 150,
+            ChildAlignment = ChildAlignments.Vertical,
+            Children = new List<Element>
+            {
+              new Element
+              {
+                Background = Color.DarkRed,
+                ChildAlignment = ChildAlignments.Horizontal,
+                Children = new List<Element>
+                {
+                  new Button(),
+                  new Button(),
+                  new Button()
+                }
+              }
+            }
+          }
         }
       };
-
-      windowOne.Closing += (sender, eventArgs) => quit = true;
       windowTwo.Closing += (sender, eventArgs) => quit = true;
-
       while (!quit)
       {
         windowOne.Update();
