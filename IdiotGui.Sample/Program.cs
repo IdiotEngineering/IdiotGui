@@ -59,29 +59,28 @@ namespace IdiotGui.Sample
       };
       windowOne.Closing += (sender, eventArgs) => quit = true;
 
-      var windowTwo = new Window("Window Two", 200, 200)
+      var windowTwo = new Window("Window Two", 1000, 1000)
       {
         Children = new List<Element>
         {
-          new Element
+          new Label
           {
             Background = Color.DarkGreen,
             Width = (SFixed) 150,
-            ChildAlignment = ChildAlignments.Vertical,
-            Children = new List<Element>
-            {
-              new Element
-              {
-                Background = Color.DarkRed,
-                ChildAlignment = ChildAlignments.Horizontal,
-                Children = new List<Element>
-                {
-                  new Button(),
-                  new Button(),
-                  new Button()
-                }
-              }
-            }
+            Text = "This is a long string that should get truncated because it's only one line and doesn't all fit on one line.",
+          },
+          new Label
+          {
+            Background = Color.DarkRed,
+            Width = new SFill(),
+            Text = "This is a long string that should wrap around. It also has explicit line-breaks in it like right here\nand also some spaces and tabs like right here\t. This text should wrap without a bottom bounds.",
+            MultiLine = true
+          },
+          new Label
+          {
+            Background = Color.DarkBlue,
+            Width = (SFixed) 150,
+            Text = "This should fit fine."
           }
         }
       };

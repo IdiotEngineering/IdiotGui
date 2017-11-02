@@ -63,13 +63,14 @@
     <Compile Include="Elements\GuiElementRendering.cs" />
     <Compile Include="Elements\GuiElementEvents.cs" />
     <Compile Include="Elements\GuiElementLayout.cs" />
+    <Compile Include="Elements\Label.cs" />
     <Compile Include="Elements\MainGuiElement.cs" />
     <Compile Include="Elements\MiscTypes.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Test.cs" />
     <Compile Include="Threading\Dispatch.cs" />
     <Compile Include="Threading\DispatchHandler.cs" />
     <Compile Include="Threading\LockstepWorkforce.cs" />
+    <Compile Include="Utilities\TextLayout.cs" />
     <Compile Include="Window.cs" />
   </ItemGroup>
   <ItemGroup>
