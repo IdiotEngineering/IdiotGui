@@ -1,8 +1,10 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using IdiotGui.Core;
 using IdiotGui.Core.BasicTypes;
 using IdiotGui.Core.Elements;
+using IdiotGui.Core.Utilities;
 
 namespace IdiotGui.Sample
 {
@@ -61,26 +63,53 @@ namespace IdiotGui.Sample
 
       var windowTwo = new Window("Window Two", 1000, 1000)
       {
+        Height = new SFill(),
+        Width = new SFill(),
+        ChildAlignment = ChildAlignments.Vertical,
         Children = new List<Element>
         {
-          new Label
+          new Element
           {
-            Background = Color.DarkGreen,
-            Width = (SFixed) 150,
-            Text = "This is a long string that should get truncated because it's only one line and doesn't all fit on one line.",
+            ChildAlignment = ChildAlignments.Horizontal,
+            Height = new SWeighted(2),
+            Border = new BorderStyle(1, Color.Pink),
+            Children = new[] {TextVerticalPosition.Top, TextVerticalPosition.Middle, TextVerticalPosition.Bottom}
+              .Select(vert =>
+                new Element
+                {
+                  Width = new SWeighted(),
+                  Border = new BorderStyle(1, Color.Red),
+                  ChildAlignment = ChildAlignments.Vertical,
+                  Children = new[]
+                      {TextHorizontalPosition.Left, TextHorizontalPosition.Middle, TextHorizontalPosition.Right}
+                    .Select(horiz => (Element) new Label
+                    {
+                      Height = new SWeighted(),
+                      VerticalTextPostion = vert,
+                      HorizontalPosition = horiz,
+                      Text = vert + " : " + horiz,
+                      Border = new BorderStyle(1, Color.White)
+                    }).ToList()
+                }
+              ).ToList()
           },
-          new Label
+          new Element
           {
-            Background = Color.DarkRed,
+            ChildAlignment = ChildAlignments.Horizontal,
+            Height = new SWeighted(1),
             Width = new SFill(),
-            Text = "This is a long string that should wrap around. It also has explicit line-breaks in it like right here\nand also some spaces and tabs like right here\t. This text should wrap without a bottom bounds.",
-            MultiLine = true
-          },
-          new Label
-          {
-            Background = Color.DarkBlue,
-            Width = (SFixed) 150,
-            Text = "This should fit fine."
+            Border = new BorderStyle(1, Color.Blue),
+            Children = new[] {TextHorizontalPosition.Left, TextHorizontalPosition.Middle, TextHorizontalPosition.Right}
+              .Select(horiz => (Element) new Label
+              {
+                Height = new SFill(),
+                Width = new SWeighted(),
+                HorizontalPosition = horiz,
+                MultiLine = true,
+                Text =
+                  "This is a long string that should start wrapping around. It also has explicit newlines in it like at the end of this line.\n It also has some tabs like [\t] and stuff.",
+                Border = new BorderStyle(1, Color.White)
+              }).ToList()
           }
         }
       };

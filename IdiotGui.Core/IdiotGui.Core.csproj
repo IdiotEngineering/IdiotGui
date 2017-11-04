@@ -70,7 +70,9 @@
     <Compile Include="Threading\Dispatch.cs" />
     <Compile Include="Threading\DispatchHandler.cs" />
     <Compile Include="Threading\LockstepWorkforce.cs" />
+    <Compile Include="Utilities\Extensions.cs" />
     <Compile Include="Utilities\TextLayout.cs" />
+    <Compile Include="Utilities\TextTokenizer.cs" />
     <Compile Include="Window.cs" />
   </ItemGroup>
   <ItemGroup>

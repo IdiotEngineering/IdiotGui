@@ -187,7 +187,7 @@ namespace IdiotGui.Core.Elements
     ///   Computes the minimum size of all elements in the tree. Note that many will have zero dimensions but (hopefully) won't
     ///   be zero after the full layout.
     /// </summary>
-    protected void ComputeSizes()
+    protected virtual void ComputeSizes()
     {
       // Compute margin-collapsing on the way down the tree
       foreach (var child in Children) child.ComputedMargin = child.Margin;

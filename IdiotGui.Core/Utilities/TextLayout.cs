@@ -6,226 +6,183 @@ using SkiaSharp;
 
 namespace IdiotGui.Core.Utilities
 {
-  public enum HorizontalTextAlignment
+  public enum TextHorizontalPosition
   {
     Left,
     Middle,
     Right
   }
 
-  public class TextLayoutResults
+  public enum TextVerticalPosition
   {
-    #region Types
+    Top,
+    Middle,
+    Bottom
+  }
 
-    public struct TextLine
-    {
-      #region Fields / Properties
-
-      public string Text;
-      public Rectangle Bounds;
-
-      #endregion
-    }
-
-    #endregion
-
+  public class TextLineLayout
+  {
     #region Fields / Properties
 
-    public IEnumerable<TextLine> TextLines;
+    public string LineText;
+    public Rectangle RelativeBounds;
 
     #endregion
+
+    public TextLineLayout(IEnumerable<TextToken> tokens, float lineHeight)
+    {
+      var builder = new StringBuilder();
+      var width = 0.0f;
+      foreach (var token in tokens)
+      {
+        builder.Append(token.Text);
+        width += token.MeasuredWidth;
+      }
+      LineText = builder.ToString();
+      RelativeBounds = new Rectangle(0, 0, width, lineHeight);
+    }
   }
 
   /// <summary>
-  ///   A dead simple text layout utility class. Doesn't use Harfbuzz or anything fancy, just Latin-1 LTR.
+  ///   A simple text layout utility class.
   /// </summary>
   public class TextLayout
   {
-    #region Types
-
-    private class WordToken
-    {
-      #region Fields / Properties
-
-      public readonly int StartLocation;
-      public readonly bool IsWhitespace;
-      public readonly bool IsNewline;
-      public int Length;
-      public float Width;
-
-      #endregion
-
-      public WordToken(int startLocation, int length, bool isWhitespace, bool isNewLine)
-      {
-        StartLocation = startLocation;
-        Length = length;
-        IsWhitespace = isWhitespace;
-        IsNewline = isNewLine;
-      }
-    }
-
-    #endregion
-
     #region Fields / Properties
 
-    /// <summary>
-    ///   The text to layout.
-    /// </summary>
     public string Text;
-
-    /// <summary>
-    ///   If true, text will wrap around after overflowing horizontally.
-    /// </summary>
-    public bool MultiLine;
-
-    /// <summary>
-    ///   If set to true, any overflow (that doesn't fit in the layout bounds) will be truncated and "..." will be added to the
-    ///   end.
-    /// </summary>
-    public bool TruncateOverflow;
-
-    /// <summary>
-    ///   How the text should be aligned horizontally.
-    /// </summary>
-    public HorizontalTextAlignment HorizontalAlignment = HorizontalTextAlignment.Middle;
-
-    /// <summary>
-    ///   The space between lines (relative to the hight of the typeface) in multi-line modes.
-    /// </summary>
     public float LineSpacing = 1.5f;
+    public SKPaint Paint;
+    public string TruncateMarker = "…";
+    public TextHorizontalPosition HorizontalPosition = TextHorizontalPosition.Left;
+    public TextVerticalPosition VerticalPosition = TextVerticalPosition.Middle;
+    public bool WrapLines = true;
+    public IEnumerable<TextLineLayout> LineLayouts;
+    public TextTokenizer Tokenizer;
+    private TokenStream _tokenStream;
 
-    private readonly SKPaint _paint;
-    private readonly float _ellipsisWidth;
+    private TextToken _truncateMarkerToken;
 
     #endregion
 
     public TextLayout(SKPaint paint)
     {
-      _paint = paint;
-      _ellipsisWidth = paint.MeasureText("…");
+      Paint = paint;
+      Tokenizer = new TextTokenizer(paint);
     }
 
-    public TextLayoutResults Layout(Size workArea)
+    /// <summary>
+    ///   Re tokenizes the string. This only needs to be done with the Text, text size or typefaces change. It does not need to
+    ///   be (and should not) called when just the layout changes.
+    /// </summary>
+    public void ReTokenize()
     {
-      var textLines = new List<TextLayoutResults.TextLine>();
-      var lineWidths = ComputeOverflows(workArea.Width);
-      var lineHeight = _paint.TextSize * LineSpacing;
-      var topOffset = lineHeight;
-      var i = 0;
-      // Always keep at least one line
-      do
-      {
-        // Keep the line
-        var left = GetLineLeft(workArea.Width, topOffset, lineWidths[i].Item2);
-        textLines.Add(new TextLayoutResults.TextLine
-        {
-          Bounds = new Rectangle(left, topOffset, lineWidths[i].Item2, lineHeight),
-          Text = lineWidths[i].Item1
-        });
-        i++;
-        topOffset += lineHeight;
-      } while (i < lineWidths.Count && topOffset < workArea.Height);
-      return new TextLayoutResults {TextLines = textLines};
+      Tokenizer.Text = Text;
+      Tokenizer.Paint = Paint;
+      Tokenizer.Tokenize();
+      _tokenStream = Tokenizer.TokenStream;
+      _truncateMarkerToken = new TextToken(TruncateMarker, Paint.MeasureText(TruncateMarker));
     }
 
-    private List<WordToken> TokenizeAndMeasure()
+    /// <summary>
+    ///   Recomputes the text layout given the Text and Paint, in the workArea provided.
+    /// </summary>
+    public void ComputeLineLayouts(Size workArea)
     {
-      // Loop over every character and tokenize.
-      var tokens = new List<WordToken>();
-      for (var i = 0; i < Text.Length; i++)
+      var lineLayouts = new List<TextLineLayout>();
+      // Must have more than one token, and a greater than 0 work area.
+      if (_tokenStream.Count == 0 || workArea.Width <= 0)
       {
-        // If the current character is a newline character, then create a new token.
-        if (Text[i] == '\r' || Text[i] == '\n')
+        LineLayouts = lineLayouts;
+        return;
+      }
+      var lineHeight = Paint.TextSize * LineSpacing;
+      _tokenStream.RewindBeginning();
+      while (_tokenStream.CanReadForward)
+      {
+        lineLayouts.Add(new TextLineLayout(GetTokenLine(workArea.Width), lineHeight));
+        // Only read a single line for non-WrapLines
+        if (!WrapLines) break;
+      }
+      //else
+      //  lineLayouts.Add(new TextLineLayout(GetSingleLineTokens(workArea.Width), lineHeight));
+      // Layout all lines horizontally
+      switch (HorizontalPosition)
+      {
+        case TextHorizontalPosition.Left:
+          break;
+        case TextHorizontalPosition.Middle:
+          foreach (var line in lineLayouts)
+            line.RelativeBounds.Left = Math.Max(0, (workArea.Width - line.RelativeBounds.Width) / 2.0f);
+          break;
+        case TextHorizontalPosition.Right:
+          foreach (var line in lineLayouts)
+            line.RelativeBounds.Left = Math.Max(0, workArea.Width - line.RelativeBounds.Width);
+          break;
+        default:
+          throw new ArgumentOutOfRangeException();
+      }
+      // Offset all lines vertically
+      var totalHeight = lineLayouts.Count * lineHeight;
+      var startOffset = 0.0f;
+      switch (VerticalPosition)
+      {
+        case TextVerticalPosition.Top:
+          startOffset = Paint.TextSize;
+          break;
+        case TextVerticalPosition.Middle:
+          startOffset = Math.Max(Paint.TextSize, (workArea.Height - totalHeight) / 2.0f + Paint.TextSize);
+          break;
+        case TextVerticalPosition.Bottom:
+          startOffset = Math.Max(Paint.TextSize, workArea.Height - totalHeight + Paint.TextSize);
+          break;
+        default:
+          throw new ArgumentOutOfRangeException();
+      }
+      var verticalOffset = startOffset;
+      foreach (var line in lineLayouts)
+      {
+        line.RelativeBounds.Top = verticalOffset;
+        verticalOffset += lineHeight;
+      }
+      LineLayouts = lineLayouts;
+    }
+
+    /// <summary>
+    ///   Returns a single line of tokens that fit within the given width. If a \n is found the line will be ended if WrapText
+    ///   is true, or ignored otherwise. Whitespace at the beginning of line will be removed. This function was a fucking
+    ///   nightmare to write... off-by-one error galore. Finally had to make the TokenStream class for sanity.
+    /// </summary>
+    private IEnumerable<TextToken> GetTokenLine(float maxWidth)
+    {
+      // Count the tokens we can fit in maxWidth
+      var width = 0.0f;
+      // Skip spaces at the beginning of stream if we aren't at the start of stream and the last token wasn't a \n
+      while (_tokenStream.CanReadBackward &&
+             !_tokenStream.PeakBackward().IsNewLine &&
+             _tokenStream.CanReadForward &&
+             _tokenStream.PeakForward().IsWhiteSpace)
+        _tokenStream.ReadForward();
+      // Make sure we didn't just skip the entire stream
+      if (!_tokenStream.CanReadForward) yield break;
+      // Read at least one non-whitespace token regardless of if it fits or not.
+      var firstToken = _tokenStream.ReadForward();
+      width += firstToken.MeasuredWidth;
+      yield return firstToken;
+      // Read the rest of the tokens that fit.
+      while (_tokenStream.CanReadForward && _tokenStream.PeakForward().MeasuredWidth + width <= maxWidth)
+      {
+        var token = _tokenStream.ReadForward();
+        // Slightly different things happen at a newline for WrapText and non-WrapText
+        if (token.IsNewLine)
         {
-          var isTwoCharacters = Text[i] == '\r' && Text.Length > i + 1 && Text[i + 1] == '\n';
-          tokens.Add(new WordToken(i, isTwoCharacters ? 2 : 1, true, true));
-          // Skip the next character if it's a \r\n as we added both of them just now.
-          if (isTwoCharacters) i++;
+          // If we are wrapping, then we are just done iterating this line.
+          if (WrapLines) yield break;
+          // If we aren't wrapping, then just ignore the \n altogether.
           continue;
         }
-        var isWhitespace = char.IsWhiteSpace(Text[i]);
-        // If there was no tokens before, or the token before had a different IsWhitespace or
-        // was a new line, then we need a new token.
-        if (tokens.Count == 0 || tokens[tokens.Count - 1].IsNewline ||
-            tokens[tokens.Count - 1].IsNewline != isWhitespace)
-          tokens.Add(new WordToken(i, 0, isWhitespace, false));
-        tokens[tokens.Count - 1].Length++;
-      }
-      // Measure all tokens
-      foreach (var token in tokens)
-        token.Width = _paint.MeasureText(Text.Substring(token.StartLocation, token.Length));
-      return tokens;
-    }
-
-    /// <summary>
-    ///   Consumes tokens starting at startIndex, filling a single line. If addTruncationMarker is set, and the line overflows,
-    ///   a "..." will be added to the end of line.
-    /// </summary>
-    private string FillLine(List<WordToken> tokens, int startIndex, float maxWidth,
-      bool addTruncationMarker, out int endIndex, out bool didTruncate, out float finalWidth)
-    {
-      didTruncate = false;
-      finalWidth = 0.0f;
-      for (endIndex = startIndex; endIndex < tokens.Count; endIndex++)
-      {
-        var token = tokens[endIndex];
-        if (finalWidth + token.Width > maxWidth)
-        {
-          // We overflowed, see if we need to add the ellipsis
-          if (addTruncationMarker)
-            while (finalWidth + _ellipsisWidth > maxWidth)
-            {
-              endIndex--;
-              finalWidth -= tokens[endIndex].Width;
-            }
-          // Set didTruncate regardless of if we added the marker or not.
-          didTruncate = true;
-          break;
-        }
-        finalWidth += token.Width;
-      }
-      var stringBuilder = new StringBuilder();
-      for (var i = startIndex; i < endIndex; i++)
-        stringBuilder.Append(Text.Substring(tokens[i].StartLocation, tokens[i].Length));
-      if (didTruncate && addTruncationMarker) stringBuilder.Append("…");
-      if (endIndex != startIndex) return stringBuilder.ToString();
-      // If we didn't consume any tokens (because the region is too narrow) then just claim we consumed at least one to avoid an infinite loop
-      didTruncate = true;
-      endIndex = startIndex + 1;
-      return stringBuilder.ToString();
-    }
-
-    /// <summary>
-    ///   Fills line(s) with tokens until they need to be wrapped or truncated.
-    /// </summary>
-    private List<Tuple<string, float>> ComputeOverflows(float maxWidth)
-    {
-      var results = new List<Tuple<string, float>>();
-      var tokens = TokenizeAndMeasure();
-      if (MultiLine)
-      {
-        for (var i = 0; i < tokens.Count; i++)
-        {
-          var lineText = FillLine(tokens, i, maxWidth, false, out i, out var didTruncate, out var finalWidth);
-          results.Add(new Tuple<string, float>(lineText, finalWidth));
-        }
-      }
-      else
-      {
-        var lineText = FillLine(tokens, 0, maxWidth, true, out var _, out var _, out var finalWidth);
-        results.Add(new Tuple<string, float>(lineText, finalWidth));
-      }
-      return results;
-    }
-
-    private float GetLineLeft(float maxWidth, float topOffset, float lineWidth)
-    {
-      switch (HorizontalAlignment)
-      {
-        case HorizontalTextAlignment.Left: return 0;
-        case HorizontalTextAlignment.Middle: return (maxWidth - lineWidth) / 2.0f;
-        case HorizontalTextAlignment.Right: return maxWidth - lineWidth;
-        default: throw new ArgumentOutOfRangeException();
+        width += token.MeasuredWidth;
+        yield return token;
       }
     }
   }
