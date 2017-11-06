@@ -37,13 +37,13 @@ namespace IdiotGui.Core.Elements
       if (Background.IsTransparent && !hasBoder)
       {
         DrawDebug(canvas);
-        foreach (var child in Children) child.Draw(canvas);
+        foreach (var child in ChildrenSnapshot) child.Draw(canvas);
         return;
       }
       DrawBackground(canvas);
       if (hasBoder) DrawBorder(canvas);
       DrawDebug(canvas);
-      foreach (var child in Children) child.Draw(canvas);
+      foreach (var child in ChildrenSnapshot) child.Draw(canvas);
     }
 
     private void DrawBackground(SKCanvas canvas)

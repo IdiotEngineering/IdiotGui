@@ -102,7 +102,7 @@ namespace IdiotGui.Core
       };
       NativeWindow.MouseMove += (sender, args) =>
       {
-        NativeWindow.Title = args.Position.ToString();
+        // NativeWindow.Title = args.Position.ToString();
         var mouseOverElement = GetTopmostElementAtPoint(args.Position);
         if (mouseOverElement != _lastMouseOver) _lastMouseOver?.OnMouseLeave();
         _lastMouseOver = mouseOverElement;
@@ -205,11 +205,13 @@ namespace IdiotGui.Core
         RenderTargetHandle = (IntPtr) framebuffer
       };
     }
+
     private void UpdateScreenSize()
     {
       Width = (SFixed) NativeWindow.Width;
       Height = (SFixed) NativeWindow.Height;
       BoxArea = new Rectangle(new Point(), WindowClientSize);
+      SnapshotChildren();
       ComputeSizes();
       LayoutChildren();
     }

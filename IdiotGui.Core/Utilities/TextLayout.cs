@@ -54,7 +54,7 @@ namespace IdiotGui.Core.Utilities
     public float LineSpacing = 1.5f;
     public SKPaint Paint;
     public string TruncateMarker = "…";
-    public TextHorizontalPosition HorizontalPosition = TextHorizontalPosition.Left;
+    public TextHorizontalPosition HorizontalPosition = TextHorizontalPosition.Middle;
     public TextVerticalPosition VerticalPosition = TextVerticalPosition.Middle;
     public bool WrapLines = true;
     public IEnumerable<TextLineLayout> LineLayouts;

@@ -67,12 +67,5 @@ namespace IdiotGui.Core.Elements
         }
       };
     }
-
-    public void UpdateScreenSize(Size size)
-    {
-      BoxArea = new Rectangle(new Point(), size);
-      ComputeSizes();
-      LayoutChildren();
-    }
   }
 }

@@ -1,6 +1,6 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using IdiotGui.Core.BasicTypes;
 
@@ -50,9 +50,11 @@ namespace IdiotGui.Core.Elements
     public BorderStyle Border = new BorderStyle(0, Theme.Colors.DefaultBorder);
 
     /// <summary>
-    ///   All children elements of this element (all drawn within ContentArea if overflow is hidden).
+    ///   All children elements of this element (all drawn within ContentArea if overflow is hidden). This IEnumerable is
+    ///   diffed each pass, so it can be updated at any point (add/remove elements). With that said, the IEnumerable should
+    ///   produce *consistent ordering* in elements or unneeded load will be places on the layout engine.
     /// </summary>
-    public List<Element> Children = new List<Element>();
+    public IEnumerable<Element> Children;
 
     /// <summary>
     ///   The total area of this element (including the surrounding margin)
@@ -74,6 +76,13 @@ namespace IdiotGui.Core.Elements
     /// </summary>
     protected BorderSize ComputedMargin;
 
+    /// <summary>
+    ///   The actual list of children, computed via diffs from the Children IEnumerable
+    /// </summary>
+    internal Element[] SolidifiedChildren = new Element[0];
+
+    internal Element[] ChildrenSnapshot;
+
     #endregion
 
     public Element GetTopmostElementAtPoint(Point point)
@@ -83,7 +92,23 @@ namespace IdiotGui.Core.Elements
           point.X > ContentArea.Left + ContentArea.Width ||
           point.Y > ContentArea.Top + ContentArea.Height) return null;
       // Return child that is top-most, or this if they are all out of bounds
-      return Children.Select(c => c.GetTopmostElementAtPoint(point)).FirstOrDefault(c => c != null) ?? this;
+      return ChildrenSnapshot.Select(c => c.GetTopmostElementAtPoint(point)).FirstOrDefault(c => c != null) ?? this;
+    }
+
+    public void DumpLayout(int indent = 0)
+    {
+      Console.WriteLine(string.Concat(Enumerable.Repeat("  ", indent)) + BoxArea + " - " + ContentArea);
+      foreach (var child in ChildrenSnapshot.ToArray()) child.DumpLayout(indent + 1);
+    }
+
+    /// <summary>
+    ///   Converts the IEnumerable Children into an array of children via a diff (only creating new children as-needed).
+    /// </summary>
+    protected void SnapshotChildren()
+    {
+      ChildrenSnapshot = Children?.ToArray() ?? new Element[0];
+      foreach (var child in ChildrenSnapshot)
+        child.SnapshotChildren();
     }
 
     /// <summary>
@@ -94,24 +119,24 @@ namespace IdiotGui.Core.Elements
     {
       ContentArea = BoxArea - ComputedMargin - Border.Size - Padding;
       // Quick short-circuit for leaf Elements
-      if (Children.Count == 0) return;
+      if (ChildrenSnapshot.Length == 0) return;
       // Handle each orientation individual, it turned into too much of a mess to try and keep major and minor axises separate.
       switch (ChildAlignment)
       {
         case ChildAlignments.Vertical:
-          var minChildrenHeight = Children.Select(c => c.ComputedMinSize.Height).Sum();
+          var minChildrenHeight = ChildrenSnapshot.Select(c => c.ComputedMinSize.Height).Sum();
           // A positive value here means an under-flow (we can expand out any SWeighted children).
           // A negative value here means an overflow (we can't fit all children). Sad times.
           var remainingContentHeight = ContentArea.Height - minChildrenHeight;
           // Sum up all SWeighted children's weight (because our pleb user might not actually have made that sum to 1.0)
-          var totalChildrenWeightedHeight = Children
+          var totalChildrenWeightedHeight = ChildrenSnapshot
             .Where(c => c.Height is SWeighted)
             .Select(c => ((SWeighted) c.Height).Weight)
             .Sum();
           // Layout each child. We allow all children to be >= their MinSize.Height, and expand out and SWeighted into
           // remainingHeight (if it's positive).
           var childBoxOffsetForVertical = ContentArea.Location;
-          foreach (var child in Children)
+          foreach (var child in ChildrenSnapshot)
           {
             var paddingHeight = child.ComputedMargin.Top + child.ComputedMargin.Bottom + child.Border.Size.Top +
                                 child.Border.Size.Bottom + Padding.Top + Padding.Bottom;
@@ -143,14 +168,14 @@ namespace IdiotGui.Core.Elements
           break;
         case ChildAlignments.Horizontal:
           // Just like the above but for horizontal
-          var minChildrenWidth = Children.Select(c => c.ComputedMinSize.Width).Sum();
+          var minChildrenWidth = ChildrenSnapshot.Select(c => c.ComputedMinSize.Width).Sum();
           var remainingContentWidth = ContentArea.Width - minChildrenWidth;
-          var totalChildrenWeightedWidth = Children
+          var totalChildrenWeightedWidth = ChildrenSnapshot
             .Where(c => c.Width is SWeighted)
             .Select(c => ((SWeighted) c.Width).Weight)
             .Sum();
           var childBoxOffsetForHorizontal = ContentArea.Location;
-          foreach (var child in Children)
+          foreach (var child in ChildrenSnapshot)
           {
             var paddingHeight = child.ComputedMargin.Top + child.ComputedMargin.Bottom + child.Border.Size.Top +
                                 child.Border.Size.Bottom + Padding.Top + Padding.Bottom;
@@ -190,12 +215,12 @@ namespace IdiotGui.Core.Elements
     protected virtual void ComputeSizes()
     {
       // Compute margin-collapsing on the way down the tree
-      foreach (var child in Children) child.ComputedMargin = child.Margin;
+      foreach (var child in ChildrenSnapshot) child.ComputedMargin = child.Margin;
       switch (ChildAlignment)
       {
         case ChildAlignments.Horizontal:
           // Collapse horizontal
-          foreach (var childPair in Children.Zip(Children.Skip(1), (lchild, rchild) => new {lchild, rchild}))
+          foreach (var childPair in ChildrenSnapshot.Zip(ChildrenSnapshot.Skip(1), (lchild, rchild) => new {lchild, rchild}))
           {
             // Collapse all middle-margins to 1/2 the value of the max of the two margins
             childPair.lchild.ComputedMargin.Right =
@@ -205,7 +230,7 @@ namespace IdiotGui.Core.Elements
           break;
         case ChildAlignments.Vertical:
           // Collapse vertical
-          foreach (var childPair in Children.Zip(Children.Skip(1), (lchild, rchild) => new {lchild, rchild}))
+          foreach (var childPair in ChildrenSnapshot.Zip(ChildrenSnapshot.Skip(1), (lchild, rchild) => new {lchild, rchild}))
           {
             // Collapse all middle-margins to 1/2 the value of the max of the two margins
             childPair.lchild.ComputedMargin.Bottom =
@@ -217,7 +242,7 @@ namespace IdiotGui.Core.Elements
           throw new ArgumentOutOfRangeException();
       }
       // Compute min size on the way up the tree
-      foreach (var child in Children) child.ComputeSizes();
+      foreach (var child in ChildrenSnapshot) child.ComputeSizes();
       // The min size starts off a the margin + border + padding
       var minShellSize = ComputedMargin + Border.Size + Padding;
       ComputedMinSize = new Size(minShellSize.Left + minShellSize.Right, minShellSize.Top + minShellSize.Bottom);
@@ -237,12 +262,12 @@ namespace IdiotGui.Core.Elements
             case ChildAlignments.Horizontal:
               // If our children are in a line then just find the largest of them
               ComputedMinSize.Height += Math.Max(MinSize.Height,
-                Children.Select(c => c.ComputedMinSize.Height).DefaultIfEmpty().Max());
+                ChildrenSnapshot.Select(c => c.ComputedMinSize.Height).DefaultIfEmpty().Max());
               break;
             case ChildAlignments.Vertical:
               // Otherwise sum them up
               ComputedMinSize.Height += Math.Max(MinSize.Height,
-                Children.Select(c => c.ComputedMinSize.Height).Sum());
+                ChildrenSnapshot.Select(c => c.ComputedMinSize.Height).Sum());
               break;
             default:
               throw new ArgumentOutOfRangeException();
@@ -264,24 +289,18 @@ namespace IdiotGui.Core.Elements
             case ChildAlignments.Horizontal:
               // Otherwise sum them up
               ComputedMinSize.Width += Math.Max(MinSize.Width,
-                Children.Select(c => c.ComputedMinSize.Width).Sum());
+                ChildrenSnapshot.Select(c => c.ComputedMinSize.Width).Sum());
               break;
             case ChildAlignments.Vertical:
               // If our children are in a line then just find the largest of them
               ComputedMinSize.Width += Math.Max(MinSize.Width,
-                Children.Select(c => c.ComputedMinSize.Width).DefaultIfEmpty().Max());
+                ChildrenSnapshot.Select(c => c.ComputedMinSize.Width).DefaultIfEmpty().Max());
               break;
             default:
               throw new ArgumentOutOfRangeException();
           }
           break;
       }
-    }
-
-    internal void DumpLayout(int indent = 0)
-    {
-      Console.WriteLine(string.Concat(Enumerable.Repeat("  ", indent)) + BoxArea + " - " + ContentArea);
-      foreach (var child in Children) child.DumpLayout(indent + 1);
     }
   }
 }
