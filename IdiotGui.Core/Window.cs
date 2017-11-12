@@ -211,7 +211,7 @@ namespace IdiotGui.Core
       Width = (SFixed) NativeWindow.Width;
       Height = (SFixed) NativeWindow.Height;
       BoxArea = new Rectangle(new Point(), WindowClientSize);
-      SnapshotChildren();
+      UpdateChildrenBindings();
       ComputeSizes();
       LayoutChildren();
     }

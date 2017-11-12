@@ -4,26 +4,26 @@
 Idiot Gui is a response to the innumerable number of over-engineered "*abstraction layer built on 10 other abstraction layers with 39 layers of indirection to decouple your MVVM/MVC/... running in 8 different processes with support for all modern microwaves*" type GUIs that are taking over the world. Idiot Gui is fast, simple and (mostly) unopinionated.
 
 ## Designed to:
-- Require zero changes for cross-platform support (Window, Mac, Linux)
+- Require zero changes for cross-platform support (Windows, Mac, Linux)
 - Have very low input latency and be fast (I'm looking at you Chromium/Electron, you monster)
 - Support applications with hundreds of simultaneously moving elements (I'm still looking at you Chromium/Electron!!)
 - Support a lot of the 'good parts' of [HTML's Flexbox](https://css-tricks.com/snippets/css/a-guide-to-flexbox/) layout, without the HTML/CSS part
-- Take advantage of the beautiful C# language (why write your GUI in a markup language with C# is so pretty?)
+- Take advantage of the beautiful C# language (why write your GUI in a markup language when C# is so pretty?)
 
 ## Not designed to:
 - Support everything including the kitchen sink
 - Look anything like the system-GUI; just like Chromium/Electron, all rendering is custom
-- Maximum the number of buzzwords in your project
+- Maximize the number of buzzwords in your project
 - **Be used by anyone. It was built by an idiot, I mean come on...**
 
-## Code
+## Free Sample
 Yea I would have probably skipped to here as well...
 ```csharp
 // This is just normal C#, no more DSLs / Markup!
 var window = new Window("The Bestest App Ever", 400, 100)
 {
   ChildAlignment = ChildAlignments.Horizontal,
-  Children = new List<Element>
+  Children = new Element[]
   {
     new Label
     {
@@ -48,29 +48,70 @@ var window = new Window("The Bestest App Ever", 400, 100)
 ```
 ![Output of the above](/Other/screenshot1.PNG?raw=true "Output of the above")
 
-### Data "Binding"
-Because Idiot-Gui is all defined in C#, adding "bindings" to create a "reactive GUI" is as easy as just using standard LINQ without all the buzzwords. Note that in this example, `thigsToAdd` can be changed at any time and will be reflected in the GUI.
+## Data Binding
+Data Binding can be tricky, jump to [Data Binding Is Easy](#data-binding-is-easy) to understand why. IdiotGui takes a more sane approach and leverages the magic powers of the C# compiler to do all the binding **at compile time** without any `dynamic` faffing about or running expensive diffs at runtime.
+
+### Binding Values
+Values are bound via C# closures:
 ```csharp
-// A normal array of strings. Will always be rendered, even if it changes later
-var thingsToAdd = new[] {"The kitchen sink", "More indirection", "More confusing stuff", "CSS? lol"};
+var changingValue = "Hello, world";
+```
+```csharp
+// Creates a "reactive" GUI element that will always reflect the value of 'changingValue'.
+// This is done with C# closures so it is very fast and compile-time type checked.
+new Label
+{
+  Text = Binding.Closure(() => changingValue)
+}
+```
+```csharp
+// Creates a 'static' GUI element that will NOT reflect changes to 'changingValue'
+new Label
+{
+  Text = changingValue
+}
+```
+
+### Binding IEnumerables (Children Elements)
+The `Children` field can also be bound to a changing source, but that binding is done differently.
+
+![Dank flip-desk meme](/Other/desk_flip.jpg?raw=true "Dank flip-desk meme")
+
+Calm yourself! Because it's an IEnumerable source, what you're actually asking for is: "IdiotGui, create a new Element when a NEWLY ADDED item appears in the source list, remove old ones and handle reorders". IdiotGui simply binds to the source IEnumerable, diffs it against the previously seen elements, and calls a user-supplied factory function to generate new Elements.
+
+This is much simpler to use than it is to explain:
+```csharp
+// A normal list of strings. Will always be rendered, even if it changes later (the GUI is "reactive").
+var changingList = new List<string> {"  ", "The kitchen sink", "More indirection", "More confusing stuff", "CSS? lol"};
 ```
 ```csharp
 var window = new Window("IdiotGui Todo List", 300, 200)
 {
   ChildAlignment = ChildAlignments.Vertical,
-  // Children is just a LINQ expression (a LINQ Select)
-  Children = thingsToAdd.Select(todo =>
-    new Label
-    {
-      Height = (SFixed) 25,
-      Border = new BorderStyle(1, Color.Cyan),
-      // Works exactly like you would expect, including later updates
-      Text = todo
-    }
-  ).ToList()
+  // Note that up until the special "SelectAndBind", this was just a normal LINQ expression.
+  // "SelectAndBind" is a "Select" variant that creates a 'EnumerableChildrenBinding' for you.
+  Children = changingList
+    .Where(str => !string.IsNullOrWhiteSpace(str))
+    .SelectAndBind(todo =>
+      new Label
+      {
+        Border = new BorderStyle(1, Color.Cyan),
+        // Works exactly like you would expect, including later updates
+        Text = todo
+      }
+  )
 };
 ```
 ![Output of the above](/Other/screenshot2.PNG?raw=true "Output of the above")
+
+*Note: The source data types must be comparable in a meaningful way for this to work correctly (they must implement GetHashCode and Equals).*
+
+#### Data Binding Is Easy
+Data binding is a hard problem to solve in a lot of GUIs. The general description of data binding is: "If the value over there changes, it should change over here as well". In a lot of GUIs carry around massive amounts of code to solve this problem because the definition and rendering are decoupled through 18 different layers. In pure C# data binding is easy to do; C# already has data binding, it's called **Closures**.
+
+The beauty of using closures is that they works exactly like you would expect thanks to the compiler. The example in [Binding Values](#binding-values) wouldn't normally work because `changingValue` is of `ValueType`, meaning it's passed around by value not reference (technically a lie, everything is passed by value, but work with me here okay). The compiler knows this, and will re-scope your `ValueType` so it can be accessed by the closure. On Top of that you get compile-time type-checking and all the assurances that go with that. If you were wondering why IdiotGui doesn't just use `dynamic`, that's why. Add in enough `dynamic` and you might as well just use JavaScript.
+
+Beautiful hu? I think so too, but everyone thinks their own kids are beautiful...
 
 ## Desalination
 Do I sound salty about the current state of desktop GUIs? No... not at all. That's why I wrote my own, because the existing ones are *so* good.

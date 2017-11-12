@@ -67,6 +67,7 @@
     <Compile Include="Elements\Label.cs" />
     <Compile Include="Elements\MainGuiElement.cs" />
     <Compile Include="Elements\MiscTypes.cs" />
+    <Compile Include="Elements\Binding.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Threading\Dispatch.cs" />
     <Compile Include="Threading\DispatchHandler.cs" />

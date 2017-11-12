@@ -1,4 +1,5 @@
-﻿using IdiotGui.Core.BasicTypes;
+﻿using System;
+using IdiotGui.Core.BasicTypes;
 using IdiotGui.Core.Utilities;
 using SkiaSharp;
 
@@ -10,15 +11,7 @@ namespace IdiotGui.Core.Elements
 
     public Color Textcolor = Color.White;
 
-    public string Text
-    {
-      get => _layout.Text;
-      set
-      {
-        _layout.Text = value;
-        _reTokenize = true;
-      }
-    }
+    public ValueBinding<string> Text = "";
 
     public TextVerticalPosition VerticalTextPostion
     {
@@ -87,6 +80,7 @@ namespace IdiotGui.Core.Elements
         IsAntialias = true
       };
       _layout = new TextLayout(_paint);
+      Height = (SFixed) 25;
     }
 
     public override void Draw(SKCanvas canvas)
@@ -94,11 +88,14 @@ namespace IdiotGui.Core.Elements
       base.Draw(canvas);
       _paint.Color = Textcolor;
       // Re-tokenize if needed
-      if (_reTokenize)
-      {
-        _layout.ReTokenize();
-        _reTokenize = false;
-      }
+      //if (_reTokenize)
+      //{
+      //  _layout.ReTokenize();
+      //  _reTokenize = false;
+      //}
+      _layout.Text = Text.Value;
+      _layout.ReTokenize();
+      _dirty = true;
       // Re-layout if needed
       if (_dirty || ContentArea.Size != _lastSize)
       {

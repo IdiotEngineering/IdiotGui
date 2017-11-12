@@ -7,12 +7,12 @@ namespace IdiotGui.Core.Elements
   {
     #region Fields / Properties
 
-    public Action<Element, KeyboardKeyEventArgs> KeyDown;
-    public Action<Element, KeyboardKeyEventArgs> KeyUp;
-    public Action<Element, MouseButtonEventArgs> MouseDown;
-    public Action<Element, MouseButtonEventArgs> MouseUp;
-    public Action<Element, MouseWheelEventArgs> MouseWheel;
-    public Action<Element, MouseButtonEventArgs> Clicked;
+    public Action<Element/*, KeyboardKeyEventArgs*/> KeyDown;
+    public Action<Element/*, KeyboardKeyEventArgs*/> KeyUp;
+    public Action<Element/*, MouseButtonEventArgs*/> MouseDown;
+    public Action<Element/*, MouseButtonEventArgs*/> MouseUp;
+    public Action<Element/*, MouseWheelEventArgs*/> MouseWheel;
+    public Action<Element/*, MouseButtonEventArgs*/> Clicked;
     public Action<Element> Focus;
     public Action<Element> LostFocus;
     public Action<Element> MouseEnter;
@@ -28,29 +28,29 @@ namespace IdiotGui.Core.Elements
     internal virtual void OnKeyDown(KeyboardKeyEventArgs e)
     {
       IsKeyDown = true;
-      KeyDown?.Invoke(this, e);
+      KeyDown?.Invoke(this);
     }
 
     internal virtual void OnKeyUp(KeyboardKeyEventArgs e)
     {
       IsKeyDown = false;
-      KeyUp?.Invoke(this, e);
+      KeyUp?.Invoke(this);
     }
 
     internal virtual void OnMouseDown(MouseButtonEventArgs e)
     {
       IsMouseDown = true;
-      MouseDown?.Invoke(this, e);
+      MouseDown?.Invoke(this);
     }
 
     internal virtual void OnMouseUp(MouseButtonEventArgs e)
     {
       IsMouseDown = false;
-      MouseUp?.Invoke(this, e);
+      MouseUp?.Invoke(this);
     }
 
-    internal virtual void OnMouseWheel(MouseWheelEventArgs e) => MouseWheel?.Invoke(this, e);
-    internal virtual void OnClicked(MouseButtonEventArgs e) => Clicked?.Invoke(this, e);
+    internal virtual void OnMouseWheel(MouseWheelEventArgs e) => MouseWheel?.Invoke(this);
+    internal virtual void OnClicked(MouseButtonEventArgs e) => Clicked?.Invoke(this);
 
     internal virtual void OnFocus()
     {
